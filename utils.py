@@ -51,7 +51,7 @@ def setz(r, state):
 
 def print_state(state, mem):
     for k, v in state.items():
-        print('k' + ':  ', v)
+        print(k + ':  ', v)
 
     print('\n')
 
