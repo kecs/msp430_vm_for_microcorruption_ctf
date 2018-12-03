@@ -1,6 +1,6 @@
 from numpy import uint16 as i16
 
-from parser import parse_asm_lines
+from asm_parser import parse_asm_lines
 
 
 MEM_SIZE = 0x5350
@@ -13,6 +13,9 @@ class State(object):
         c  = False
         gt = False  # Used for jumps instead of z, n, v
         eq = False  # Used for jumps instead of z, n, v
+
+        def __repr__(self):
+            return 'z: {}\nc: {}\ngt: {}\neq: {}\n'.format(self.z, self.c, self.gt, self.eq)
     
     def __init__(self, **kwargs):
         registers = dict(('r{0}'.format(i), i16(0)) for i in range(4, 16))
@@ -28,22 +31,35 @@ class State(object):
         for k, v in registers.items():
             setattr(self, k, v)
 
-    def __getitem__(self, item):
+    def __getitem__(self, key):
         """ Support both state.attr and state['attr'] lookup. """
         
-        return getattr(self, item)
+        return getattr(self, key)
 
-    def __setitem__(self, item, attr):
+    def __setitem__(self, key, attr):
         """ Support both state.attr and state['attr'] assignment. """
+
+        if not (isinstance(attr, i16) or isinstance(attr, int)):
+            raise ValueError('Registers in State must be ints! {} supplied.'.format(type(attr)))
         
-        return setattr(self, item, attr)
+        setattr(self, key, i16(attr))
+
+    def __repr__(self):
+        to_ret = ''
+        
+        for k, v in self.__dict__.items():
+            if isinstance(v, i16):
+                to_ret += '{}:  {}\n'.format(k, hex(v))
+            elif isinstance(v, self.Flags):
+                to_ret += repr(v)
+
+        return to_ret
 
     
-
 class VM(object):
     def __init__(self, state=None, mem=None):
         self.state = state or State()
-        self.mem = mem or tuple(0 for _ in range(MEM_SIZE))
+        self.mem = mem or [0 for _ in range(MEM_SIZE)]
 
     def runasm(self, *args):
         instructions = []
@@ -67,3 +83,4 @@ class VM(object):
                 self.state.pc += 2
                 fn(*(list(params) + [self.state, self.mem]))
         
+
