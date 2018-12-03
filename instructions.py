@@ -1,23 +1,32 @@
 from utils import (from_addr,
                    fetch_1st_arg,
-                   print_state,
+                   get_offset,
                    setz,)
 
 
 @fetch_1st_arg
 def mov(n, rb, state, mem):
     if rb.startswith('@'):
-        mem[state[rb[1:]]] = n
+        rb, offset = get_offset(rb[1:])
+        mem[state[rb] + offset] = n
     else:
         state[rb] = n
 
     setz(rb, state)
 
+    
+@fetch_1st_arg
+def movb(n, rb, state, mem):
+    n &= 0x00ff
+
+    mov(n, rb, state, mem)
+
 
 @fetch_1st_arg
 def add(n, rb, state, mem):
     if rb.startswith('@'):
-        mem[state[rb[1:]]] += n
+        rb, offset = get_offset(rb[1:])
+        mem[state[rb] + offset] += n
     else:
         state[rb] += n
 
@@ -27,36 +36,30 @@ def add(n, rb, state, mem):
 @fetch_1st_arg
 def sub(n, rb, state, mem):
     if rb.startswith('@'):
-        mem[state[rb[1:]]] -= n
+        rb, offset = get_offset(rb[1:])
+        mem[state[rb] + offset] -= n
     else:
         state[rb] -= n
 
     setz(rb, state)
     
 
-
-@fetch_1st_arg
 def inc(r, state, mem):
     state[r] += 1
 
     setz(r)
 
 
-@fetch_1st_arg
 def dec(r, state, mem):
     state[r] -= 1
     
     setz(r)
 
 
-
-@fetch_1st_arg
 def clr(r, state, mem):
     state[r] = 0
 
 
-
-@fetch_1st_arg
 def sxt(r, state, mem):
     state[r] &= 0x00ff
 
@@ -65,36 +68,41 @@ def sxt(r, state, mem):
 
 
 @fetch_1st_arg
-def _and(ra, rb, state, mem):
+def and_(ra, rb, state, mem):
     if rb.startswith('@'):
-        mem[state[rb[1:]]] &= ra
+        rb, offset = get_offset(rb[1:])
+        mem[state[rb] + offset] &= ra
     else:
         state[rb] &= n
 
     setz(rb, state)
-        
 
-@fetch_1st_arg
+
 def push(r, state, mem):
-    high_byte = state[r] >> 8
-    low_byte  = state[r] & 0x00ff
+    # Dummy implementation, 1 slot is occupied
+    mem[state.sp] = state[r]
+    state.sp -= 1
+
+    # Adhere endianness
+    # high_byte = state[r] >> 8
+    # low_byte  = state[r] & 0x00ff
+    # mem[state.sp + 1] = high_byte
+    # mem[state.sp]       = low_byte
+    # state.sp -= 2
+
     
-    mem[state.sp + 1] = high_byte
-    mem[state.sp]       = low_byte
-        
-    state.sp -= 2
-
-
-@fetch_1st_arg
 def pop(r, state, mem):
-    high_byte = mem[state.sp + 1]
-    low_byte  = mem[state.sp]
+    # Dummy implementation, 1 slot is occupied
+    state[r] = mem[state.sp]
+    state.sp += 1
+    
+    # Adhere endianness
+    # high_byte = mem[state.sp + 1]
+    # low_byte  = mem[state.sp]
+    # state[r] = (high_byte << 8) | low_byte
+    # state.sp += 2
 
-    state[r] = (high_byte << 8) | low_byte
-    state.sp += 2
 
-
-@fetch_1st_arg
 def call(fn, state, mem):
     """ Args: fn is a pyhton callable """
     
@@ -102,12 +110,10 @@ def call(fn, state, mem):
     fn()
 
 
-@fetch_1st_arg
 def ret(state, mem):
     pop('pc')
     
 
-@fetch_1st_arg
 def tst(r, state, mem):
     if isinstance(r, str) and r.startswith('@'):
         r = from_addr(r[1:])
@@ -118,20 +124,17 @@ def tst(r, state, mem):
         state.flags.z = False
         
 
-@fetch_1st_arg
 def tstb(r, state, mem):
     if isinstance(r, str) and r.startswith('@'):
         r = from_addr(r[1:])
 
-    tst(r & 0x00ff, **kwargs)
+    tst(r & 0x00ff, state, mem)
 
 
-@fetch_1st_arg
 def jmp(addr, state, mem):
     return addr
 
 
-@fetch_1st_arg
 def jz(addr, state, mem):
     if state.flags.z:
         return addr
@@ -140,7 +143,8 @@ def jz(addr, state, mem):
 @fetch_1st_arg
 def cmp(ra, rb, state, mem):
     if isinstance(rb, str) and rb.startswith('@'):
-        rb = from_addr(rb[1:])
+        rb = rb[1:]
+        rb = from_addr(rb)
 
     # TODO: refactor
     if ra <= rb:
@@ -166,40 +170,34 @@ def cmpb(ra, rb, state, mem):
     if isinstance(rb, str) and rb.startswith('@'):
         rb = from_addr(rb[1:])
 
-    return cmp(ra & 0x00ff, rb & 0x00ff, **kwargs)
+    return cmp(ra & 0x00ff, rb & 0x00ff, state, mem)
         
 
-@fetch_1st_arg
 def jnz(addr, state, mem):
     if not state.flags.z:
         return addr
 
     
-@fetch_1st_arg
 def jeq(addr, state, mem):
     if state.flags.eq:
         return addr
 
 
-@fetch_1st_arg
 def jge(addr, state, mem):
     # TODO: implement, adjust cmp
-    if state['flags']['ge']:
+    if state.flags.ge:
         return addr
 
 
-@fetch_1st_arg
 def jl(addr, state, mem):
     # TODO: implement, adjust cmp
-    if not state['flags']['z']:
+    if not state.flags.z:
         return addr
 
     
-@fetch_1st_arg
 def b(state, mem):
-    """ Debug instruction """
-    
-    print_state()
+    print(state)
+    import pdb
     pdb.set_trace()
 
 jne = jnz
