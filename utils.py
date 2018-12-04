@@ -24,7 +24,7 @@ def get_offset(locator):
     else:
         offset = 0
 
-    return (locator, offset)
+    return (splitted[0], offset)
 
 
 def from_addr(locator, state, mem):

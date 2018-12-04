@@ -1,5 +1,6 @@
 import time
 import unittest
+from numpy import uint16 as i16
 
 from instructions import *
 from vm import VM
@@ -59,39 +60,40 @@ class TestInstructions(unittest.TestCase):
         self.state, self.mem = self.vm.state, self.vm.mem
 
     def test_mov_const_to_reg(self):
-        mov(0x3, 'r8', self.state, self.mem)
-        self.assertEqual(self.state.r8, 0x3)
+        mov(i16(0x3), 'r8', self.state, self.mem)
+        self.assertEqual(self.state.r8, i16(0x3))
 
     def test_mov_reg_to_reg(self):
-        self.state.r4 = 0x3
+        self.state.r4 = i16(0x3)
         mov('r4', 'r8', self.state, self.mem)
         self.assertEqual(3, self.state.r8)
 
     def test_mov_addr_to_reg(self):
-        self.mem[0x666] = 0x1234
-        self.state.r4 = 0x666
+        self.mem[0x666] = (0x1234)
+        self.state.r4 = i16(0x666)
         mov('@r4', 'r4', self.state, self.mem)
         self.assertEqual(0x1234, self.state.r4)
 
+    # This fails
     def test_mov_addr_plus_offset_to_reg(self):
-        self.mem[0x66a] = 0x1234
-        self.state.r4 = 0x666
+        self.mem[0x66a] = i16(0x1234)
+        self.state.r4 = i16(0x666)
         mov('@r4+4', 'r4', self.state, self.mem)
         self.assertEqual(0x1234, self.state.r4)
 
     def test_mov_addr_to_reg(self):
-        self.mem[0x666] = 0x1234
-        self.state.r4 = 0x666
-        self.state.r5 = 0x555
+        self.mem[0x666] = i16(0x1234)
+        self.state.r4 = i16(0x666)
+        self.state.r5 = i16(0x555)
         mov('@r4', '@r5', self.state, self.mem)
-        self.assertEqual(0x1234, self.mem[0x555])
-    
+        self.assertEqual(0x1234, self.mem[i16(0x555)])
+
     def test_mov_addr_plus_offset_to_reg_plus_offset(self):
-        self.mem[0x66a] = 0x1234
-        self.state.r4 = 0x666
-        self.state.r5 = 0x555
+        self.mem[0x66a] = i16(0x1234)
+        self.state.r4 = i16(0x666)
+        self.state.r5 = i16(0x555)
         mov('@r4+4', '@r6+3', self.state, self.mem)
-        self.assertEqual(0x1234, self.mem[0x558])
+        self.assertEqual(0x1234, self.mem[i16(0x558)])
         
 #     @unittest.skip("Not now")
 #     def test_setz(self):

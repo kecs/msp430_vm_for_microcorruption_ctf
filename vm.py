@@ -47,11 +47,13 @@ class State(object):
     def __repr__(self):
         to_ret = ''
         
-        for k, v in self.__dict__.items():
-            if isinstance(v, i16):
-                to_ret += '{}:  {}\n'.format(k, hex(v))
-            elif isinstance(v, self.Flags):
-                to_ret += repr(v)
+        attrs = [(k, v) for k, v in self.__dict__.items() if isinstance(v, i16)]
+        attrs.sort(key=lambda t: t[0])
+        
+        for (k, v) in attrs:
+            to_ret += '{}:  {}\n'.format(k, hex(v))
+
+        to_ret += repr(self.flags)
 
         return to_ret
 
