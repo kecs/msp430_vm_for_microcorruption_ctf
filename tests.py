@@ -74,14 +74,13 @@ class TestInstructions(unittest.TestCase):
         mov('@r4', 'r4', self.state, self.mem)
         self.assertEqual(0x1234, self.state.r4)
 
-    # This fails
     def test_mov_addr_plus_offset_to_reg(self):
         self.mem[0x66a] = i16(0x1234)
         self.state.r4 = i16(0x666)
         mov('@r4+4', 'r4', self.state, self.mem)
         self.assertEqual(0x1234, self.state.r4)
 
-    def test_mov_addr_to_reg(self):
+    def test_mov_addr_to_reg_2(self):
         self.mem[0x666] = i16(0x1234)
         self.state.r4 = i16(0x666)
         self.state.r5 = i16(0x555)
@@ -89,102 +88,91 @@ class TestInstructions(unittest.TestCase):
         self.assertEqual(0x1234, self.mem[i16(0x555)])
 
     def test_mov_addr_plus_offset_to_reg_plus_offset(self):
-        self.mem[0x66a] = i16(0x1234)
+        place_1 = 0x333
+        place_2 = 0x4231
+        val_1   = 0x1234
+        
+        self.mem[place_1 + 4] = i16(val_1)
+        self.state.r4 = i16(place_1)
+        self.state.r6 = i16(place_2)
+        mov('@r4+4', '@r6+3', self.state, self.mem)
+        self.assertEqual(0x1234, self.mem[self.state.r4 + 4])
+        self.assertEqual(0x1234, self.mem[self.state.r6 + 3])
+
+    def test_movb_addr_to_reg(self):
+        self.mem[0x666] = i16(0x1234)
         self.state.r4 = i16(0x666)
         self.state.r5 = i16(0x555)
-        mov('@r4+4', '@r6+3', self.state, self.mem)
-        self.assertEqual(0x1234, self.mem[i16(0x558)])
+        movb('@r4', '@r5', self.state, self.mem)
+        self.assertEqual(0x34, self.mem[i16(0x555)])
+
+    def test_add_reg_to_reg(self):
+        self.state.r4 = i16(0x666)
+        self.state.r5 = i16(0x555)
+        add('r4', 'r5', self.state, self.mem)
+        self.assertEqual(self.state.r5, i16(0x555) + i16(0x666))
+
+    def test_addb_reg_to_reg(self):
+        self.state.r4 = i16(0x666)
+        self.state.r5 = i16(0x555)
+        addb('r4', 'r5', self.state, self.mem)
+        self.assertEqual(self.state.r5, i16(0x555) + i16(0x66))
+
+    def test_sub_reg_to_reg(self):
+        self.state.r4 = i16(0x5)
+        self.state.r5 = i16(0x1234)
+        sub('r4', 'r5', self.state, self.mem)
+        self.assertEqual(self.state.r5, i16(0x1234) - i16(0x5))
+
+    def test_inc_reg(self):
+        self.state.r5 = i16(0x1234)
+        inc('r5', self.state, self.mem)
+        self.assertEqual(self.state.r5, i16(0x1235))
+
+    def test_dec_reg(self):
+        self.state.r5 = i16(0x1234)
+        dec('r5', self.state, self.mem)
+        self.assertEqual(self.state.r5, i16(0x1233))
+
+
+    def test_clr_reg(self):
+        self.state.r5 = i16(0x1234)
+        clr('r5', self.state, self.mem)
+        self.assertEqual(self.state.r5, i16(0))
+
+    def test_sxt_reg(self):
+        self.state.r5 = i16(0x80)
+        sxt('r5', self.state, self.mem)
+        self.assertEqual(self.state.r5, i16(0xff80))
+
+    def test_and_reg_reg(self):
+        self.state.r5 = i16(0x80)
+        self.state.r6 = i16(0x80)
+        and_('r5', 'r6', self.state, self.mem)
+        self.assertEqual(self.state.r6, i16(0x80))
+        
+    def test_push_const(self):
+        self.state.sp = i16(0x33)
+        push(i16(0x1234), self.state, self.mem)
+        self.assertEqual(self.mem[i16(0x32)], i16(0x1234))
+
+    def test_push_reg(self):
+        self.state.sp = i16(0x13)
+        self.state.r5 = i16(0x80)
+        push('r5', self.state, self.mem)
+        self.assertEqual(self.mem[i16(0x12)], i16(0x80))
+
+    def test_tstb_false(self):
+        self.state.r5 = i16(0xdead)
+        tstb('r5', self.state, self.mem)
+        self.assertEqual(self.state.flags.z, False)
+
+    def test_tstb_true(self):
+        self.state.r5 = i16(0x100)
+        tstb('r5', self.state, self.mem)
+        self.assertEqual(self.state.flags.z, True)
+
         
 #     @unittest.skip("Not now")
-#     def test_setz(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_add(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_sub(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_inc(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_dec(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_clr(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_sxt(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test__and(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_push(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_pop(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_call(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_ret(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_tst(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_tstb(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_from_addr(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_jmp(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_jz(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_cmp(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_cmpb(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_jnz(self):
-#         pass
-    
-#     @unittest.skip("Not now")
-#     def test_jeq(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_jge(self):
-#         pass
-
-#     @unittest.skip("Not now")
-#     def test_jl(self):
-#         pass
 
 unittest.main()

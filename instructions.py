@@ -1,3 +1,5 @@
+from numpy import uint16 as i16
+
 from utils import (from_addr,
                    fetch_1st_arg,
                    get_offset,
@@ -17,7 +19,7 @@ def mov(n, rb, state, mem):
     
 @fetch_1st_arg
 def movb(n, rb, state, mem):
-    n &= 0x00ff
+    n &= i16(0x00ff)
 
     mov(n, rb, state, mem)
 
@@ -34,6 +36,13 @@ def add(n, rb, state, mem):
 
 
 @fetch_1st_arg
+def addb(n, rb, state, mem):
+    n &= i16(0x00ff)
+    
+    add(n, rb, state, mem)
+    
+
+@fetch_1st_arg
 def sub(n, rb, state, mem):
     if rb.startswith('@'):
         rb, offset = get_offset(rb[1:])
@@ -45,26 +54,26 @@ def sub(n, rb, state, mem):
     
 
 def inc(r, state, mem):
-    state[r] += 1
+    state[r] += i16(1)
 
-    setz(r)
+    setz(r, state)
 
 
 def dec(r, state, mem):
-    state[r] -= 1
+    state[r] -= i16(1)
     
-    setz(r)
+    setz(r, state)
 
 
 def clr(r, state, mem):
-    state[r] = 0
+    state[r] = i16(0)
 
 
 def sxt(r, state, mem):
-    state[r] &= 0x00ff
-
-    if 0x80 <=  state[r] <= 0xff:
-        state[r] += 0xff00
+    state[r] &= i16(0x00ff)                               
+                                                          
+    if i16(0x80) <= state[r] <= i16(0xff):          
+        state[r] += i16(0xff00)
 
 
 @fetch_1st_arg
@@ -73,15 +82,19 @@ def and_(ra, rb, state, mem):
         rb, offset = get_offset(rb[1:])
         mem[state[rb] + offset] &= ra
     else:
-        state[rb] &= n
+        state[rb] &= ra
 
     setz(rb, state)
 
 
 def push(r, state, mem):
     # Dummy implementation, 1 slot is occupied
-    mem[state.sp] = state[r]
-    state.sp -= 1
+    state.sp -= i16(1)
+
+    if isinstance(r, i16) or isinstance(r, int):
+        mem[state.sp] = i16(r)
+    else:
+        mem[state.sp] = state[r]
 
     # Adhere endianness
     # high_byte = state[r] >> 8
@@ -93,8 +106,8 @@ def push(r, state, mem):
     
 def pop(r, state, mem):
     # Dummy implementation, 1 slot is occupied
+    state.sp += i16(1)
     state[r] = mem[state.sp]
-    state.sp += 1
     
     # Adhere endianness
     # high_byte = mem[state.sp + 1]
@@ -115,20 +128,49 @@ def ret(state, mem):
     
 
 def tst(r, state, mem):
-    if isinstance(r, str) and r.startswith('@'):
-        r = from_addr(r[1:])
-    
-    if r == 0:
+    if r == i16(0):
         state.flags.z = True
     else:
         state.flags.z = False
         
 
 def tstb(r, state, mem):
-    if isinstance(r, str) and r.startswith('@'):
-        r = from_addr(r[1:])
+    tst(state[r] & i16(0x00ff), state, mem)
 
-    tst(r & 0x00ff, state, mem)
+
+@fetch_1st_arg
+def cmp(ra, rb, state, mem):
+    if isinstance(rb, str) and rb.startswith('@'):
+        rb = from_addr(rb[1:])
+    elif isinstance(rb, str) and rb.startswith('r'):
+        rb = state[rb]
+
+    if ra <= rb:
+        state.flags.ge = True
+    else:
+        state.flags.ge = False
+
+    if ra >= rb:
+        state.flags.jl = True
+    else:
+        state.flags.jl = False
+        
+    if ra != rb:
+        state.flags.z = True
+        state.flags.eq = False
+    else:
+        state.flags.z = False
+        state.flags.eq = True
+
+
+@fetch_1st_arg
+def cmpb(ra, rb, state, mem):
+    if isinstance(rb, str) and rb.startswith('@'):
+        rb = from_addr(rb[1:])
+    elif isinstance(rb, str) and rb.startswith('r'):
+        rb = state[rb]
+
+    return cmp(ra & i16(0x00ff), rb & i16(0x00ff), state, mem)
 
 
 def jmp(addr, state, mem):
@@ -139,39 +181,6 @@ def jz(addr, state, mem):
     if state.flags.z:
         return addr
 
-
-@fetch_1st_arg
-def cmp(ra, rb, state, mem):
-    if isinstance(rb, str) and rb.startswith('@'):
-        rb = rb[1:]
-        rb = from_addr(rb)
-
-    # TODO: refactor
-    if ra <= rb:
-        state['flags']['ge'] = True
-    else:
-        state['flags']['ge'] = False
-
-    if ra >= rb:
-        state['flags']['jl'] = True
-    else:
-        state['flags']['jl'] = False
-        
-    if ra != rb:
-        state['flags']['z'] = True
-        state['flags']['eq'] = False
-    else:
-        state['flags']['z'] = False
-        state['flags']['eq'] = True
-
-
-@fetch_1st_arg
-def cmpb(ra, rb, state, mem):
-    if isinstance(rb, str) and rb.startswith('@'):
-        rb = from_addr(rb[1:])
-
-    return cmp(ra & 0x00ff, rb & 0x00ff, state, mem)
-        
 
 def jnz(addr, state, mem):
     if not state.flags.z:
