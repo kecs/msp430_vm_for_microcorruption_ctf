@@ -106,8 +106,8 @@ def push(r, state, mem):
     
 def pop(r, state, mem):
     # Dummy implementation, 1 slot is occupied
-    state.sp += i16(1)
     state[r] = mem[state.sp]
+    state.sp += i16(1)
     
     # Adhere endianness
     # high_byte = mem[state.sp + 1]
@@ -170,7 +170,7 @@ def cmpb(ra, rb, state, mem):
     elif isinstance(rb, str) and rb.startswith('r'):
         rb = state[rb]
 
-    return cmp(ra & i16(0x00ff), rb & i16(0x00ff), state, mem)
+    cmp(ra & i16(0x00ff), rb & i16(0x00ff), state, mem)
 
 
 def jmp(addr, state, mem):
@@ -193,14 +193,17 @@ def jeq(addr, state, mem):
 
 
 def jge(addr, state, mem):
-    # TODO: implement, adjust cmp
     if state.flags.ge:
         return addr
 
 
 def jl(addr, state, mem):
-    # TODO: implement, adjust cmp
-    if not state.flags.z:
+    if not state.flags.jl:
+        return addr
+
+    
+def jne(addr, state, mem):
+    if not state.flags.eq:
         return addr
 
     
@@ -209,4 +212,3 @@ def b(state, mem):
     import pdb
     pdb.set_trace()
 
-jne = jnz
