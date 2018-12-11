@@ -38,10 +38,12 @@ def from_addr(locator, state, mem):
 def setz(r, state):
     if state[r] == 0:
         state.flags.z = True
-
+    else:
+        state.flags.z = False
 
 def memset(s, addr, state, mem):
     # TODO: make it work for non printables
     
     for i, c in enumerate(s):
         mem[addr + i] = ord(c)
+
