@@ -162,6 +162,14 @@ class TestInstructions(unittest.TestCase):
         push('r5', self.state, self.mem)
         self.assertEqual(self.mem[i16(0x12)], i16(0x80))
 
+    def test_pop(self):
+        self.state.sp = i16(0x13)
+        self.state.r5 = i16(0x80)
+        push('r5', self.state, self.mem)
+        self.state.r5 = i16(0x3)
+        pop('r5', self.state, self.mem)
+        self.assertEqual(self.state.r5, i16(0x80))
+        
     def test_tstb_false(self):
         self.state.r5 = i16(0xdead)
         tstb('r5', self.state, self.mem)
@@ -172,7 +180,27 @@ class TestInstructions(unittest.TestCase):
         tstb('r5', self.state, self.mem)
         self.assertEqual(self.state.flags.z, True)
 
+    def test_jnz(self):
+        self.state.flags.z = False
+        ret = jnz(i16(0x4321), self.state, self.mem)
+        self.assertEqual(ret, i16(0x4321))
         
-#     @unittest.skip("Not now")
 
+class TestSnippetParseAndExecuteWithJmp(unittest.TestCase):
+    def setUp(self):
+        self.vm = VM() 
+        self.state, self.mem = self.vm.state, self.vm.mem
+
+    def test_cycle(self):
+        self.vm.runasm("""
+        mov #0x0, sp
+        mov #0x10, r8
+        mov r8, 0x0(sp)
+        inc sp
+        dec r8
+        jnz #-0x3
+        """)
+
+        self.assertEqual(self.mem[1], i16(0xf))
+        
 unittest.main()
