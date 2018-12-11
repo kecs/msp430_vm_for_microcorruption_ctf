@@ -13,9 +13,10 @@ class State(object):
         c  = False
         gt = False  # Used for jumps instead of z, n, v
         eq = False  # Used for jumps instead of z, n, v
+        jl = False  # Used for jumps instead of z, n, v
 
         def __repr__(self):
-            return 'z: {}\nc: {}\ngt: {}\neq: {}\n'.format(self.z, self.c, self.gt, self.eq)
+            return 'z: {}\nc: {}\ngt: {}\neq: {}\njl: {}\n'.format(self.z, self.c, self.gt, self.eq, self.jl)
     
     def __init__(self, **kwargs):
         registers = dict(('r{0}'.format(i), i16(0)) for i in range(4, 16))
@@ -53,9 +54,7 @@ class State(object):
         for (k, v) in attrs:
             to_ret += '{}:  {}\n'.format(k, hex(v))
 
-        to_ret += repr(self.flags)
-
-        return to_ret
+        return to_ret + repr(self.flags)
 
     
 class VM(object):
@@ -65,24 +64,25 @@ class VM(object):
 
     def runasm(self, *args):
         instructions = []
+        self.state.pc = 0
         
         for arg in args:
             if callable(arg):
                 arg(self.state, self.mem)
             elif isinstance(arg, str):
                 instructions += parse_asm_lines(arg)
-            else:
+            elif isinstance(arg, tuple) or isinstance(arg, list):
                 instructions.append(arg)
-
-        for instruction in instructions:
-            fn, params = instruction[0], instruction[1:]
-            
-            if fn.__name__.startswith('j'):
-                pass
-                # TODO: jmp?
-            
             else:
-                self.state.pc += 2
-                fn(*(list(params) + [self.state, self.mem]))
-        
+                raise ValueError('Supply instruction list, or asm string or callable!')
 
+        while 0 <= self.state.pc < len(instructions):
+            instruction = instructions[self.state.pc]
+            fn, params = instruction[0], instruction[1:]
+            ret = fn(*(list(params) + [self.state, self.mem]))
+
+            if fn.__name__.startswith('j') and ret:
+                self.state.pc += ret
+            else:
+                self.state.pc += 1
+                
