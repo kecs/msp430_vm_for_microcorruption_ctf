@@ -17,18 +17,23 @@ def load(instruction_name):
 
 
 OP2_OPERANDS = OrderedDict((
+    # 1st arg is an addr (@)
+    ('\s+@(\w+),\s+(\w+)\((\w+)\)', lambda f, a, offs, b: (load(f), '@' + a, '@{}+{}'.format(b, offs))),
+    ('\s+@(\w+),\s+0x0\((\w+)\)', lambda f, a, b: (load(f), '@' + a, '@' + b)),
+    ('\s+@(\w+),\s+(\w+)', lambda f, a, b: (load(f), '@' + a, b)),
+    
     # Replaces 0x0(r) with @r
-    ('\s+#?0x0\((\w+)\),\s+0x0\((\w+)\)', lambda f, a, b: (load(f), '@' + a, '@' + b)),
-    ('\s+#?0x0\((\w+)\),\s+(\w+)', lambda f, a, b: (load(f), '@' + a, b)),
-    ('\s+#?(\w+),\s+0x0\((\w+)\)', lambda f, a, b: (load(f), a, '@' + b)),
+    ('\s+#?-?0x0\((\w+)\),\s+0x0\((\w+)\)', lambda f, a, b: (load(f), '@' + a, '@' + b)),
+    ('\s+#?-?0x0\((\w+)\),\s+(\w+)', lambda f, a, b: (load(f), '@' + a, b)),
+    ('\s+#?-?(\w+),\s+0x0\((\w+)\)', lambda f, a, b: (load(f), a, '@' + b)),
     
     # Replace 0x33(r) with @r+33
-    ('\s+#?(\w+)\((\w+)\),\s+(\w+)\((\w+)\)', lambda f, offs1, a, offs2, b: (load(f), '@{}+{}'.format(a, offs1), '@{}+{}'.format(b, offs2))),
-    ('\s+#?(\w+),\s+(\w+)\((\w+)\)', lambda f, a, offs, b: (load(f), a, '@{}+{}'.format(b, offs))),
-    ('\s+#?(\w+)\((\w+)\),\s+(\w+)', lambda f, offs, a, b: (load(f), '@{}+{}'.format(a, offs), b)),
+    ('\s+#?-?(\w+)\((\w+)\),\s+(\w+)\((\w+)\)', lambda f, offs1, a, offs2, b: (load(f), '@{}+{}'.format(a, offs1), '@{}+{}'.format(b, offs2))),
+    ('\s+#?-?(\w+),\s+(\w+)\((\w+)\)', lambda f, a, offs, b: (load(f), a, '@{}+{}'.format(b, offs))),
+    ('\s+#?-?(\w+)\((\w+)\),\s+(\w+)', lambda f, offs, a, b: (load(f), '@{}+{}'.format(a, offs), b)),
     
-    # TODO: it's swallowing + for @rxx+
-    ('\s+#?(@*\w+)\+?,\s+(\w+)', lambda f, a, b: (load(f), a, b)),
+    # TODO: it's swallowing `+` for @rxx+
+    ('\s+#?-?(@*\w+)\+?,\s+(\w+)', lambda f, a, b: (load(f), a, b)),
 ))
 
 OP2_PATTERNS = OrderedDict(
@@ -36,11 +41,11 @@ OP2_PATTERNS = OrderedDict(
 )
 
 OP1_PATTERNS = OrderedDict({
-    '(inc|dec|push|pop|clr|sxt|call|ret|tst|tst\.b|jmp|jz|jnz|jl|jge|jne)\s+(\w+)': lambda f, arg: (load(f), arg),
+    '(inc|dec|push|pop|clr|sxt|call|ret|tst|tst\.b|jmp|jz|jnz|jl|jge|jne)\s+#?(-?\w+)': lambda f, arg: (load(f), arg),
 })
 
 def cast(s):
-    m = re.search('0x(\w+)', s)
+    m = re.search('-?0x(\w+)', s)
     if m and ('+' not in s):
         return int(m.group(), 16)
     else:
@@ -54,9 +59,9 @@ def parse_asm_line(line):
     for regex, fn in OP_PATTERNS.items():
         m = re.search(regex, line)
         if m:
-            # print('[*] ', m.groups())
             return fn(*[cast(s) for s in m.groups()])
+        
+    raise ValueError('Cannot parse line: ' + line)
             
 def parse_asm_lines(s):
-    return [parse_asm_line(l) for l in s.split('\n') if l.strip()]
-
+    return [parse_asm_line(l.strip()) for l in s.split('\n') if l.strip()]
