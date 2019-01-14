@@ -1,67 +1,62 @@
 import re
 import pdb
 from collections import OrderedDict
+from numpy import uint16 as i16
 
 import instructions
 
 
-def load(instruction_name):
-    " Translate asm fn name to python fn name, handle reserved. "
+def load_fn(instruction_name):
+    """ Translate asm fn name to python fn name, handle reserved words. """
     
     if instruction_name.endswith('.b'):
         return getattr(instructions, instruction_name.replace('.', ''))
-    if instruction_name == 'and':
+    elif instruction_name == 'and':
         return instructions.and_
     else:
         return getattr(instructions, instruction_name)
 
-
-OP2_OPERANDS = OrderedDict((
-    # 1st arg is an addr (@)
-    ('\s+@(\w+),\s+(\w+)\((\w+)\)', lambda f, a, offs, b: (load(f), '@' + a, '@{}+{}'.format(b, offs))),
-    ('\s+@(\w+),\s+0x0\((\w+)\)', lambda f, a, b: (load(f), '@' + a, '@' + b)),
-    ('\s+@(\w+),\s+(\w+)', lambda f, a, b: (load(f), '@' + a, b)),
     
-    # Replaces 0x0(r) with @r
-    ('\s+#?-?0x0\((\w+)\),\s+0x0\((\w+)\)', lambda f, a, b: (load(f), '@' + a, '@' + b)),
-    ('\s+#?-?0x0\((\w+)\),\s+(\w+)', lambda f, a, b: (load(f), '@' + a, b)),
-    ('\s+#?-?(\w+),\s+0x0\((\w+)\)', lambda f, a, b: (load(f), a, '@' + b)),
-    
-    # Replace 0x33(r) with @r+33
-    ('\s+#?-?(\w+)\((\w+)\),\s+(\w+)\((\w+)\)', lambda f, offs1, a, offs2, b: (load(f), '@{}+{}'.format(a, offs1), '@{}+{}'.format(b, offs2))),
-    ('\s+#?-?(\w+),\s+(\w+)\((\w+)\)', lambda f, a, offs, b: (load(f), a, '@{}+{}'.format(b, offs))),
-    ('\s+#?-?(\w+)\((\w+)\),\s+(\w+)', lambda f, offs, a, b: (load(f), '@{}+{}'.format(a, offs), b)),
-    
-    # TODO: it's swallowing `+` for @rxx+
-    ('\s+#?-?(@*\w+)\+?,\s+(\w+)', lambda f, a, b: (load(f), a, b)),
-))
+def parse_arg(s):
+    """ Translate addresses to IL """
 
-OP2_PATTERNS = OrderedDict(
-    (('(mov|mov\.b|add|sub|and|cmp|cmp\.b)' + k, v) for k, v in OP2_OPERANDS.items())
-)
-
-OP1_PATTERNS = OrderedDict({
-    '(inc|dec|push|pop|clr|sxt|call|ret|tst|tst\.b|jmp|jz|jnz|jl|jge|jne)\s+#?(-?\w+)': lambda f, arg: (load(f), arg),
-})
-
-def cast(s):
-    m = re.search('-?0x(\w+)', s)
-    if m and ('+' not in s):
-        return int(m.group(), 16)
-    else:
+    if re.match('r\d{1,2}|@.+|sp|pc', s):
         return s
 
-OP_PATTERNS = OrderedDict()
-OP_PATTERNS.update(OP1_PATTERNS)
-OP_PATTERNS.update(OP2_PATTERNS)
+    m = re.search('(-?)0x(\w+)\((\w+)\)', s)
+    if m:
+        offset = (m.groups()[0] and '-' or '+') + m.groups()[1]
+        return f'@{m.groups()[2]}{offset}'
+
+    raise ValueError(f'Cannot parse string: {s} {type(s)}')
+        
+    
+def parse_first_arg(s):
+    if s.startswith('#'):
+        return i16(int(s[1:], 16))
+    else:
+        return parse_arg(s)
+        
 
 def parse_asm_line(line):
-    for regex, fn in OP_PATTERNS.items():
-        m = re.search(regex, line)
-        if m:
-            return fn(*[cast(s) for s in m.groups()])
-        
-    raise ValueError('Cannot parse line: ' + line)
-            
+    splitted = re.split(',?\s+', line)
+    fn = load_fn(splitted[0])
+    
+    if len(splitted) == 1:
+        return (fn, )
+    elif len(splitted) == 2:
+        if fn.__name__.startswith('j'):
+            return (fn, int(splitted[1]))
+        elif fn.__name__ == 'call':
+            return (fn, splitted[1])
+        else:
+            return (fn, parse_first_arg(splitted[1]))
+    elif len(splitted) == 3:
+        return (fn, parse_first_arg(splitted[1]), parse_arg(splitted[2]))
+    else:
+        raise ValueError(f'Cannot parse line: {line}')
+    
+
 def parse_asm_lines(s):
     return [parse_asm_line(l.strip()) for l in s.split('\n') if l.strip()]
+
