@@ -1,9 +1,11 @@
+import pdb
+import time, sys # TODO: rm
 from numpy import uint16 as i16
 
 from asm_parser import parse_asm_lines
 
 
-MEM_SIZE = 0x5350
+MEM_SIZE    = 0x5350
 STACK_START = 0x4400
 
 
@@ -16,13 +18,13 @@ class State(object):
         jl = False  # Used for jumps instead of z, n, v
 
         def __repr__(self):
-            return 'z: {}\nc: {}\ngt: {}\neq: {}\njl: {}\n'.format(self.z, self.c, self.gt, self.eq, self.jl)
+            return f'z: {self.z}\nc: {self.c}\ngt: {self.gt}\neq: {self.eq}\njl: {self.jl}\n'
     
     def __init__(self, **kwargs):
-        registers = dict(('r{0}'.format(i), i16(0)) for i in range(4, 16))
+        registers = dict((f'r{i}', i16(0)) for i in range(4, 16))
 
         registers.update({
-            'pc':     i16(0),
+            'pc':     0,
             'sp':     i16(STACK_START),
             'flags':  self.Flags(),
         })
@@ -34,14 +36,14 @@ class State(object):
 
     def __getitem__(self, key):
         """ Support both state.attr and state['attr'] lookup. """
-        
+
         return getattr(self, key)
 
     def __setitem__(self, key, attr):
         """ Support both state.attr and state['attr'] assignment. """
 
         if not (isinstance(attr, i16) or isinstance(attr, int)):
-            raise ValueError('Registers in State must be ints! {} supplied.'.format(type(attr)))
+            raise ValueError(f'Registers in State must be ints! {type(attr)} ({attr}) suppplied. Key={key}')
         
         setattr(self, key, i16(attr))
 
@@ -52,17 +54,20 @@ class State(object):
         attrs.sort(key=lambda t: t[0])
         
         for (k, v) in attrs:
-            to_ret += '{}:  {}\n'.format(k, hex(v))
+            to_ret += f'{k}:  {hex(v)}\n'
 
+        to_ret += f'pc:  {hex(self.pc)}\n'
+            
         return to_ret + repr(self.flags)
 
     
 class VM(object):
-    def __init__(self, state=None, mem=None):
+    def __init__(self, state=None, mem=None, subroutines=None):
         self.state = state or State()
-        self.mem = mem or [0 for _ in range(MEM_SIZE)]
+        self.mem = mem or [i16(0) for _ in range(MEM_SIZE)]
+        self.subroutines = subroutines or {}
 
-    def runasm(self, *args):
+    def runasm(self, *args, dbg=False):
         instructions = []
         self.state.pc = 0
         
@@ -74,15 +79,20 @@ class VM(object):
             elif isinstance(arg, tuple) or isinstance(arg, list):
                 instructions.append(arg)
             else:
-                raise ValueError('Supply instruction list, or asm string or callable!')
+                raise ValueError('Supply instruction as list, asm string or callable!')
 
         while 0 <= self.state.pc < len(instructions):
             instruction = instructions[self.state.pc]
             fn, params = instruction[0], instruction[1:]
             ret = fn(*(list(params) + [self.state, self.mem]))
 
+            if fn.__name__ == 'call':
+                self.subroutines[ret](self)                
+            elif fn.__name__ == 'ret':
+                returng
+                
             if fn.__name__.startswith('j') and ret:
                 self.state.pc += ret
             else:
                 self.state.pc += 1
-                
+            
