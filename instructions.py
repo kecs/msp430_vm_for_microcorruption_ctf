@@ -20,7 +20,6 @@ def mov(n, rb, state, mem):
 @fetch_1st_arg
 def movb(n, rb, state, mem):
     n &= i16(0x00ff)
-
     mov(n, rb, state, mem)
 
 
@@ -116,26 +115,27 @@ def pop(r, state, mem):
     # state.sp += 2
 
 
-def call(fn, state, mem):
-    """ Args: fn is a pyhton callable """
+def call(fn_name, state, mem):
+    push(state.pc, state, mem)
     
-    push('pc')
-    fn()
+    return fn_name
 
 
 def ret(state, mem):
-    pop('pc')
-    
+    pop('pc', state, mem)
 
+
+@fetch_1st_arg
 def tst(r, state, mem):
-    if r == i16(0):
+    if i16(r) == i16(0):
         state.flags.z = True
     else:
         state.flags.z = False
         
 
+@fetch_1st_arg
 def tstb(r, state, mem):
-    tst(state[r] & i16(0x00ff), state, mem)
+    tst(i16(0x00ff) & i16(r), state, mem)
 
 
 @fetch_1st_arg
